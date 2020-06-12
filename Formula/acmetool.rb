@@ -3,18 +3,38 @@ require "language/go"
 class Acmetool < Formula
   desc "Automatic certificate acquisition tool for ACME (Let's Encrypt)"
   homepage "https://github.com/hlandau/acme"
-  url "https://github.com/hlandau/acme.git",
-      :tag      => "v0.0.67",
-      :revision => "221ea15246f0bbcf254b350bee272d43a1820285"
-  head "https://github.com/hlandau/acme.git"
 
-  bottle do
-    cellar :any_skip_relocation
-    rebuild 1
-    sha256 "859ddcc717399c6724283beece51c0a93497e00be685d3f1cfb7153506cbd9bb" => :catalina
-    sha256 "fd6d5e67865a1038fef6f4b183c255e42e4eb6470d5847e804639197f226da6b" => :mojave
-    sha256 "62ec2c87880494488a50d78c36104f75eb97bb160ddf316387ab116e51ace2fd" => :high_sierra
+  stable do
+    url "https://github.com/hlandau/acme.git",
+        :tag      => "v0.0.67",
+        :revision => "221ea15246f0bbcf254b350bee272d43a1820285"
+
+    bottle do
+      cellar :any_skip_relocation
+      rebuild 1
+      sha256 "859ddcc717399c6724283beece51c0a93497e00be685d3f1cfb7153506cbd9bb" => :catalina
+      sha256 "fd6d5e67865a1038fef6f4b183c255e42e4eb6470d5847e804639197f226da6b" => :mojave
+      sha256 "62ec2c87880494488a50d78c36104f75eb97bb160ddf316387ab116e51ace2fd" => :high_sierra
+    end
   end
+
+  devel do
+    url "https://github.com/hlandau/acme.git",
+        :tag      => "v0.2.1",
+        :revision => "f68b275d0a0ca526525b1d11e58be9b7e995251f"
+
+    go_resource "gopkg.in/hlandau/acmeapi.v2" do
+      url "https://gopkg.in/hlandau/acmeapi.v2.git",
+          :revision => "4c466ab079c59d00344630cb861d075f3a75bc56"
+    end
+
+    go_resource "gopkg.in/square/go-jose.v2" do
+      url "https://gopkg.in/square/go-jose.v2.git",
+          :revision => "3a5ee095dcb5030a9de84fb92c222ac652fff176"
+    end
+  end
+
+  head "https://github.com/hlandau/acme.git"
 
   depends_on "go" => :build
 
@@ -169,17 +189,22 @@ class Acmetool < Formula
       -X github.com/hlandau/acme/responder.StandardWebrootPath=#{var}/run/acmetool/acme-challenge
     ]
 
+    unless build.stable?
+      ldflags.each do |s|
+        s.gsub! "hlandau/acme", "hlandau/acmetool"
+      end
+    end
+
     if build.head?
       inreplace "Makefile" do |s|
         s.gsub! /-ldflags "(.*)"/, '\1'
         s.gsub! /(\$\(call BUILDINFO.*\)\))/, '-ldflags "$(LDFLAGS) \1"'
         s.gsub! /(install) -Dp/, '\1 -d $(DESTDIR)$(PREFIX)/bin && \1 -p'
       end
-      ldflags.each { |s| s.gsub! "hlandau/acme", "hlandau/acmetool" }
       system "make", "LDFLAGS=#{ldflags.join(" ")}", "PREFIX=#{prefix}", "USE_BUILDINFO=1", "V=1", "install"
     else
       (buildpath/"src/github.com/hlandau").mkpath
-      ln_sf buildpath, buildpath/"src/github.com/hlandau/acme"
+      ln_sf buildpath, buildpath/"src/github.com/hlandau/#{build.stable? ? "acme" : "acmetool"}"
       Language::Go.stage_deps resources, buildpath/"src"
 
       cd "cmd/acmetool" do
